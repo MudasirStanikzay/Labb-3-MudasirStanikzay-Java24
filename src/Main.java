@@ -2,163 +2,259 @@ import java.sql.*;
 import java.util.Scanner;
 
 public class Main {
+    public static void main(String[] args) {
+        // Connect to the SQLite database
+        String url = "jdbc:sqlite:recipes.db";
+        try (Connection connection = DriverManager.getConnection(url)) {
+            if (connection != null) {
+                System.out.println("Connected to the database.");
+                createTables(connection); // Ensure the tables are created
+                Scanner scanner = new Scanner(System.in);
 
-    // Databasanslutning
-    public static class Database {
-        private static final String URL = "jdbc:sqlite:recept.db";
+                while (true) {
+                    System.out.println("1. Add Recipe");
+                    System.out.println("2. Add Ingredient");
+                    System.out.println("3. Show Recipes and Ingredients");
+                    System.out.println("4. Update Recipe");
+                    System.out.println("5. Delete Recipe");
+                    System.out.println("6. Update Ingredient");
+                    System.out.println("7. Delete Ingredient");  // New option for deleting ingredients
+                    System.out.println("8. Exit");
+                    System.out.print("Enter your choice: ");
+                    int choice = scanner.nextInt();
+                    scanner.nextLine();  // Consume the newline character
 
-        public static Connection getConnection() throws SQLException {
-            return DriverManager.getConnection(URL);
+                    switch (choice) {
+                        case 1:
+                            addRecipe(connection);
+                            break;
+                        case 2:
+                            addIngredient(connection);
+                            break;
+                        case 3:
+                            showRecipesAndIngredients(connection);
+                            break;
+                        case 4:
+                            updateRecipe(connection);
+                            break;
+                        case 5:
+                            deleteRecipe(connection);
+                            break;
+                        case 6:
+                            updateIngredient(connection);
+                            break;
+                        case 7:
+                            deleteIngredient(connection);  // New option for deleting ingredients
+                            break;
+                        case 8:
+                            System.out.println("Exiting...");
+                            return;
+                        default:
+                            System.out.println("Invalid choice. Please try again.");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println("Database error: " + e.getMessage());
         }
     }
 
-    // Lägga till ett recept
-    public static void addRecipe(Scanner scanner) {
-        try (Connection conn = Database.getConnection()) {
-            System.out.println("Enter recipe name:");
+    // Method to create tables if they don't exist
+    public static void createTables(Connection connection) {
+        try {
+            String createRecipeTable = "CREATE TABLE IF NOT EXISTS recipe (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    "name TEXT NOT NULL, " +
+                    "description TEXT)";
+            String createIngredientsTable = "CREATE TABLE IF NOT EXISTS ingredients (" +
+                    "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    "recipe_id INTEGER, " +
+                    "ingredient TEXT, " +
+                    "quantity TEXT, " +
+                    "FOREIGN KEY(recipe_id) REFERENCES recipe(id))";
+
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute(createRecipeTable);
+                stmt.execute(createIngredientsTable);
+                System.out.println("Database tables created successfully.");
+            }
+        } catch (SQLException e) {
+            System.out.println("Error creating tables: " + e.getMessage());
+        }
+    }
+
+    // Add a new recipe
+    public static void addRecipe(Connection connection) {
+        Scanner scanner = new Scanner(System.in);
+        try {
+            System.out.print("Enter recipe name: ");
             String name = scanner.nextLine();
-            System.out.println("Enter recipe description:");
+            System.out.print("Enter recipe description: ");
             String description = scanner.nextLine();
 
             String sql = "INSERT INTO recipe (name, description) VALUES (?, ?)";
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
                 pstmt.setString(1, name);
                 pstmt.setString(2, description);
                 pstmt.executeUpdate();
                 System.out.println("Recipe added successfully!");
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.out.println("Database error: " + e.getMessage());
         }
     }
 
-    // Lägga till en ingrediens
-    public static void addIngredient(Scanner scanner) {
-        try (Connection conn = Database.getConnection()) {
-            System.out.println("Enter recipe ID:");
+    // Add a new ingredient
+    public static void addIngredient(Connection connection) {
+        Scanner scanner = new Scanner(System.in);
+        try {
+            System.out.print("Enter recipe ID: ");
             int recipeId = scanner.nextInt();
-            scanner.nextLine(); // Ta bort ny rad
-            System.out.println("Enter ingredient name:");
-            String name = scanner.nextLine();
-            System.out.println("Enter ingredient quantity:");
+            scanner.nextLine();  // Consume the newline character
+
+            System.out.print("Enter ingredient name: ");
+            String ingredient = scanner.nextLine();
+            System.out.print("Enter ingredient quantity: ");
             String quantity = scanner.nextLine();
 
-            String sql = "INSERT INTO ingredient (recipe_id, name, quantity) VALUES (?, ?, ?)";
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            String sql = "INSERT INTO ingredients (recipe_id, ingredient, quantity) VALUES (?, ?, ?)";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
                 pstmt.setInt(1, recipeId);
-                pstmt.setString(2, name);
+                pstmt.setString(2, ingredient);
                 pstmt.setString(3, quantity);
                 pstmt.executeUpdate();
                 System.out.println("Ingredient added successfully!");
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.out.println("Database error: " + e.getMessage());
         }
     }
 
-    // Visa recept och ingredienser
-    public static void showRecipesWithIngredients() {
-        try (Connection conn = Database.getConnection()) {
-            String sql = """
-                    SELECT r.name AS recipe_name, r.description AS recipe_description,
-                           i.name AS ingredient_name, i.quantity AS ingredient_quantity
-                    FROM recipe r
-                    LEFT JOIN ingredient i ON r.id = i.recipe_id
-                    """;
-
-            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
+    // Show recipes and ingredients
+    public static void showRecipesAndIngredients(Connection connection) {
+        try {
+            String sqlRecipes = "SELECT * FROM recipe";
+            try (Statement stmt = connection.createStatement();
+                 ResultSet rs = stmt.executeQuery(sqlRecipes)) {
                 while (rs.next()) {
-                    String recipeName = rs.getString("recipe_name");
-                    String recipeDescription = rs.getString("recipe_description");
-                    String ingredientName = rs.getString("ingredient_name");
-                    String ingredientQuantity = rs.getString("ingredient_quantity");
+                    int recipeId = rs.getInt("id");
+                    String recipeName = rs.getString("name");
+                    String recipeDescription = rs.getString("description");
 
                     System.out.println("Recipe: " + recipeName + " - " + recipeDescription);
-                    if (ingredientName != null) {
-                        System.out.println("  Ingredient: " + ingredientName + " - " + ingredientQuantity);
+
+                    // Show ingredients for this recipe
+                    String sqlIngredients = "SELECT * FROM ingredients WHERE recipe_id = ?";
+                    try (PreparedStatement pstmt = connection.prepareStatement(sqlIngredients)) {
+                        pstmt.setInt(1, recipeId);
+                        try (ResultSet rsIngredients = pstmt.executeQuery()) {
+                            while (rsIngredients.next()) {
+                                String ingredient = rsIngredients.getString("ingredient");
+                                String quantity = rsIngredients.getString("quantity");
+                                System.out.println("\tIngredient: " + ingredient + " - " + quantity);
+                            }
+                        }
                     }
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.out.println("Database error: " + e.getMessage());
         }
     }
 
-    // Uppdatera ett recept
-    public static void updateRecipe(Scanner scanner) {
-        try (Connection conn = Database.getConnection()) {
-            System.out.println("Enter recipe ID to update:");
-            int id = scanner.nextInt();
-            scanner.nextLine(); // Ta bort ny rad
-            System.out.println("Enter new recipe name:");
-            String name = scanner.nextLine();
-            System.out.println("Enter new recipe description:");
-            String description = scanner.nextLine();
+    // Update a recipe
+    public static void updateRecipe(Connection connection) {
+        Scanner scanner = new Scanner(System.in);
+        try {
+            System.out.print("Enter recipe ID to update: ");
+            int recipeId = scanner.nextInt();
+            scanner.nextLine();  // Consume the newline character
+
+            System.out.print("Enter new recipe name: ");
+            String newName = scanner.nextLine();
+            System.out.print("Enter new recipe description: ");
+            String newDescription = scanner.nextLine();
 
             String sql = "UPDATE recipe SET name = ?, description = ? WHERE id = ?";
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setString(1, name);
-                pstmt.setString(2, description);
-                pstmt.setInt(3, id);
-                int rowsAffected = pstmt.executeUpdate();
-                if (rowsAffected > 0) {
-                    System.out.println("Recipe updated successfully!");
-                } else {
-                    System.out.println("Recipe not found.");
-                }
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, newName);
+                pstmt.setString(2, newDescription);
+                pstmt.setInt(3, recipeId);
+                pstmt.executeUpdate();
+                System.out.println("Recipe updated successfully!");
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.out.println("Database error: " + e.getMessage());
         }
     }
 
-    // Radera ett recept
-    public static void deleteRecipe(Scanner scanner) {
-        try (Connection conn = Database.getConnection()) {
-            System.out.println("Enter recipe ID to delete:");
-            int id = scanner.nextInt();
-
-            String sql = "DELETE FROM recipe WHERE id = ?";
-            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
-                pstmt.setInt(1, id);
-                int rowsAffected = pstmt.executeUpdate();
-                if (rowsAffected > 0) {
-                    System.out.println("Recipe deleted successfully!");
-                } else {
-                    System.out.println("Recipe not found.");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    // Huvudprogram
-    public static void main(String[] args) {
+    // Delete a recipe
+    public static void deleteRecipe(Connection connection) {
         Scanner scanner = new Scanner(System.in);
-        while (true) {
-            System.out.println("1. Add Recipe");
-            System.out.println("2. Add Ingredient");
-            System.out.println("3. Show Recipes and Ingredients");
-            System.out.println("4. Update Recipe");
-            System.out.println("5. Delete Recipe");
-            System.out.println("6. Exit");
-            System.out.print("Enter your choice: ");
-            int choice = scanner.nextInt();
-            scanner.nextLine(); // Ta bort ny rad
+        try {
+            System.out.print("Enter recipe ID to delete: ");
+            int recipeId = scanner.nextInt();
 
-            switch (choice) {
-                case 1 -> addRecipe(scanner);
-                case 2 -> addIngredient(scanner);
-                case 3 -> showRecipesWithIngredients();
-                case 4 -> updateRecipe(scanner);
-                case 5 -> deleteRecipe(scanner);
-                case 6 -> {
-                    System.out.println("Exiting...");
-                    return;
-                }
-                default -> System.out.println("Invalid choice. Try again.");
+            // First, delete the ingredients for this recipe
+            String deleteIngredients = "DELETE FROM ingredients WHERE recipe_id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(deleteIngredients)) {
+                pstmt.setInt(1, recipeId);
+                pstmt.executeUpdate();
             }
+
+            // Now, delete the recipe itself
+            String deleteRecipe = "DELETE FROM recipe WHERE id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(deleteRecipe)) {
+                pstmt.setInt(1, recipeId);
+                pstmt.executeUpdate();
+                System.out.println("Recipe deleted successfully!");
+            }
+        } catch (SQLException e) {
+            System.out.println("Database error: " + e.getMessage());
+        }
+    }
+
+    // Update an ingredient
+    public static void updateIngredient(Connection connection) {
+        Scanner scanner = new Scanner(System.in);
+        try {
+            System.out.print("Enter ingredient ID to update: ");
+            int ingredientId = scanner.nextInt();
+            scanner.nextLine();  // Consume the newline character
+
+            System.out.print("Enter new ingredient name: ");
+            String newIngredient = scanner.nextLine();
+            System.out.print("Enter new ingredient quantity: ");
+            String newQuantity = scanner.nextLine();
+
+            String sql = "UPDATE ingredients SET ingredient = ?, quantity = ? WHERE id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setString(1, newIngredient);
+                pstmt.setString(2, newQuantity);
+                pstmt.setInt(3, ingredientId);
+                pstmt.executeUpdate();
+                System.out.println("Ingredient updated successfully!");
+            }
+        } catch (SQLException e) {
+            System.out.println("Database error: " + e.getMessage());
+        }
+    }
+
+    // Delete an ingredient
+    public static void deleteIngredient(Connection connection) {
+        Scanner scanner = new Scanner(System.in);
+        try {
+            System.out.print("Enter ingredient ID to delete: ");
+            int ingredientId = scanner.nextInt();
+
+            String sql = "DELETE FROM ingredients WHERE id = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+                pstmt.setInt(1, ingredientId);
+                pstmt.executeUpdate();
+                System.out.println("Ingredient deleted successfully!");
+            }
+        } catch (SQLException e) {
+            System.out.println("Database error: " + e.getMessage());
         }
     }
 }
