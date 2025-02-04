@@ -18,7 +18,7 @@ public class Main {
                     System.out.println("4. Update Recipe");
                     System.out.println("5. Delete Recipe");
                     System.out.println("6. Update Ingredient");
-                    System.out.println("7. Delete Ingredient");  // New option for deleting ingredients
+                    System.out.println("7. Delete Ingredient");
                     System.out.println("8. Exit");
                     System.out.print("Enter your choice: ");
                     int choice = scanner.nextInt();
@@ -44,7 +44,7 @@ public class Main {
                             updateIngredient(connection);
                             break;
                         case 7:
-                            deleteIngredient(connection);  // New option for deleting ingredients
+                            deleteIngredient(connection);
                             break;
                         case 8:
                             System.out.println("Exiting...");
@@ -62,11 +62,21 @@ public class Main {
     // Method to create tables if they don't exist
     public static void createTables(Connection connection) {
         try {
-            String createRecipeTable = "CREATE TABLE IF NOT EXISTS recipe (" +
+            // Drop tables if they exist
+            String dropIngredientsTable = "DROP TABLE IF EXISTS ingredients";
+            String dropRecipeTable = "DROP TABLE IF EXISTS recipe";
+
+            try (Statement stmt = connection.createStatement()) {
+                stmt.execute(dropIngredientsTable);
+                stmt.execute(dropRecipeTable);
+            }
+
+            // Create tables
+            String createRecipeTable = "CREATE TABLE recipe (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "name TEXT NOT NULL, " +
                     "description TEXT)";
-            String createIngredientsTable = "CREATE TABLE IF NOT EXISTS ingredients (" +
+            String createIngredientsTable = "CREATE TABLE ingredients (" +
                     "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "recipe_id INTEGER, " +
                     "ingredient TEXT, " +
